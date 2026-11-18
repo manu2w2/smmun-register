@@ -1,0 +1,26 @@
+#:schema https://supabase.com/schemas/config/v1.json
+project_id = "smmun-register"
+
+[api]
+enabled = true
+port = 54321
+auto_expose_new_tables = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[local_smtp]
+enabled = true
+port = 54324
+
+[auth]
+site_url = "http://localhost:5173"
