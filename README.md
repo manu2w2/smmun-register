@@ -2,7 +2,7 @@
 
 Nuevo sistema de registro del Modelo de Naciones Unidas del Sureste Mexicano (SMMUN). El proyecto comienza con el catálogo de representaciones y el plan para trasladar la persistencia de Firestore a PostgreSQL en Supabase.
 
-**Estado actual.** Fase uno, documentación y diseño. La aplicación y el entorno local se prepararán en la fase dos.
+**Estado actual.** El repositorio contiene la documentación y la base del entorno de desarrollo. La portada indica que el registro aún está cerrado.
 
 | Componente | Alcance actual |
 | --- | --- |
@@ -24,7 +24,47 @@ Nuevo sistema de registro del Modelo de Naciones Unidas del Sureste Mexicano (SM
 
 ## Desarrollo local
 
-La base propuesta es SvelteKit con TypeScript y Supabase local con Docker. En la fase dos se fijarán las versiones de Node y Supabase CLI, la configuración del stack, las variables de ejemplo y los comandos verificados para instalar, iniciar y probar con datos sintéticos.
+Usa Node.js **24.18.0** y npm **11.16.0**. El lockfile fija SvelteKit **3.3.1** y Supabase CLI **3.2.0**. Para levantar la base local, instala y abre [Docker Desktop en Windows](https://docs.docker.com/desktop/setup/install/windows-install/) o usa un motor Docker compatible.
+
+```sh
+npm ci
+npm run dev
+```
+
+Abre `http://localhost:5173`. La portada de desarrollo se puede comprobar sin Docker.
+
+```sh
+docker info
+npm run db:start
+npm run db:check
+npm run db:status
+```
+
+Con Docker en ejecución, Supabase inicia la API local en `http://127.0.0.1:54321`, PostgreSQL 17 en el puerto `54322` y Studio en `http://127.0.0.1:54323`. La primera ejecución descarga las imágenes del stack. Para detenerlo, usa `npm run db:stop`. [Documentación de desarrollo local](https://supabase.com/docs/guides/local-development/cli/getting-started)
+
+Al integrar el cliente, copia `.env.example` a `.env.local` y toma la clave publicable de `npm run db:status`. Las variables con prefijo `PUBLIC_` pueden llegar al navegador. Reserva las credenciales privilegiadas para el servidor. Estos comandos de desarrollo operan sobre el stack local y no requieren vincular el proyecto alojado.
+
+El archivo [`fixtures/catalogo.csv`](fixtures/catalogo.csv) contiene filas sintéticas con los cuatro encabezados observados en la hoja y valores `SI`/`NO`. Sirve para preparar la importación de la siguiente fase.
+
+```sh
+npm run check
+npm run build
+npm run preview
+```
+
+GitHub Actions ejecuta las verificaciones de tipos y compilación, levanta Supabase local y consulta la versión de PostgreSQL. CI usa contenedores y datos de prueba.
+
+## Flujo de ramas
+
+| Rama | Uso |
+| --- | --- |
+| `dev` | Integra el trabajo y valida cambios con datos sintéticos. Crea las ramas de trabajo a partir de `dev`. |
+| `stage` | Recibe cambios de `dev` por pull request para revisarlos antes de publicar. |
+| `main` | Rama principal. Recibe cambios de `stage` por pull request. |
+
+CI se ejecuta con cada push o pull request de estas ramas. Para una promoción, usa un merge commit para conservar el historial y espera el check `verify`. Documenta en el PR la prueba realizada y cualquier limitación.
+
+Las ramas definen el flujo del código. El hosting y un proyecto Supabase aislado para staging se decidirán antes de conectar despliegues. Consulta [Cómo promover cambios](docs/operations.md#promover-cambios).
 
 ## Repositorios de referencia
 

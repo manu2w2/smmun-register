@@ -1,5 +1,13 @@
 # Operación prevista
 
+## Promover cambios
+
+1. Integra el trabajo en `dev` con commits que identifiquen el cambio. Comprueba `npm run check`, `npm run build` y, si cambias la base, `npm run db:check` con Supabase local iniciado.
+2. Abre un pull request de `dev` a `stage`. Revisa el check `verify`, el resultado esperado y las migraciones incluidas. Usa un merge commit para la promoción.
+3. Abre un pull request de `stage` a `main` cuando el alcance esté validado. GitHub verifica el código con un stack local y la revisión en staging se incorpora cuando exista un entorno separado.
+
+Mantén `dev` y CI con datos sintéticos. Para un staging alojado, usa credenciales y base de datos distintas de producción. Antes de configurar despliegues, identifica el proyecto de destino y la forma de revertir cada cambio.
+
 ## Actualizar el catálogo
 
 Preparar la hoja de cuatro columnas, identificar la edición y revisar la vista previa de la importación. Resolver duplicados, renombres y bajas antes de confirmar el lote. Comparar conteos después de aplicar los cambios. La disponibilidad existente se mantiene en PostgreSQL según el [procedimiento propuesto de importación](data-model.md).

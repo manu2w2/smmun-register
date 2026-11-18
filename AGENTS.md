@@ -23,4 +23,5 @@ Este repositorio prepara el nuevo registro del Modelo de Naciones Unidas del Sur
 - Responde y documenta en español. Mantén los identificadores técnicos y nombres de código en inglés cuando corresponda.
 - Inspecciona el estado y las instrucciones locales antes de editar. Conserva el trabajo existente y evita agregar dependencias sin una necesidad concreta.
 - Revisa las diferencias y ejecuta las verificaciones pertinentes. Para cambios de datos, cubre las restricciones o riesgos afectados, como reimportación, disponibilidad, concurrencia y permisos. Informa el resultado y sus límites.
+- Integra el trabajo en `dev`. Promueve a `stage` desde `dev` y a `main` desde `stage` con pull requests y el check `verify` en verde. Usa commits específicos por cambio.
 - Actualiza el README cuando cambien los requisitos locales o los comandos que realmente funcionan.

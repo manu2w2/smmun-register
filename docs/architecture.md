@@ -10,7 +10,7 @@ Esta decisión resuelve la procedencia del catálogo y del indicador de disponib
 | --- | --- | --- |
 | Google Sheets | Preparar las cuatro columnas de catálogo. | Definido. |
 | PostgreSQL en Supabase | Mantener catálogo, disponibilidad, registros y asignaciones. | Plataforma y separación definidas. Falta el esquema físico. |
-| SvelteKit y TypeScript | Continuar con la tecnología y la identidad visual del sitio. | Propuesta. |
+| SvelteKit y TypeScript | Continuar con la tecnología y la identidad visual del sitio. | Portada estática y entorno de desarrollo configurados. |
 | API de recepción | Validar solicitudes en servidor y guardar su aceptación con idempotencia. | Diseño pendiente. Edge Functions o FastAPI como puente son opciones. |
 | Archivos y entregas | Guardar comprobantes en Storage privado y procesar correos de forma durable, si forman parte del flujo nuevo. | Storage, Queues, Cron y Resend son propuestas. |
 | Panel interno | Dar a Finanzas una vista de registros y asignaciones. | En evaluación. |
