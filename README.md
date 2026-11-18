@@ -42,6 +42,15 @@ npm run db:status
 
 Con Docker en ejecución, Supabase inicia la API local en `http://127.0.0.1:54321`, PostgreSQL 17 en el puerto `54322` y Studio en `http://127.0.0.1:54323`. La primera ejecución descarga las imágenes del stack. Para detenerlo, usa `npm run db:stop`. [Documentación de desarrollo local](https://supabase.com/docs/guides/local-development/cli/getting-started)
 
+En Windows, si se atasca la descarga de Edge Runtime o se reinicia el contenedor de logs, puedes trabajar en el catálogo con el arranque reducido que se probó en este equipo.
+
+```sh
+npm run db:start -- --exclude edge-runtime,vector,logflare
+npm run db:check
+```
+
+Este modo mantiene PostgreSQL, Studio y la API. Para probar Edge Functions o el procesamiento de logs, usa el arranque completo.
+
 Al integrar el cliente, copia `.env.example` a `.env.local` y toma la clave publicable de `npm run db:status`. Las variables con prefijo `PUBLIC_` pueden llegar al navegador. Reserva las credenciales privilegiadas para el servidor. Estos comandos de desarrollo operan sobre el stack local y no requieren vincular el proyecto alojado.
 
 El archivo [`fixtures/catalogo.csv`](fixtures/catalogo.csv) contiene filas sintéticas con los cuatro encabezados observados en la hoja y valores `SI`/`NO`. Sirve para preparar la importación de la siguiente fase.
