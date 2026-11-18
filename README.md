@@ -73,7 +73,7 @@ GitHub Actions ejecuta las verificaciones de tipos y compilación, levanta Supab
 
 CI se ejecuta con cada push o pull request de estas ramas. Para una promoción, usa un merge commit para conservar el historial y espera el check `verify`. Documenta en el PR la prueba realizada y cualquier limitación.
 
-Las ramas definen el flujo del código. El hosting y un proyecto Supabase aislado para staging se decidirán antes de conectar despliegues. Consulta [Cómo promover cambios](docs/operations.md#promover-cambios).
+Cada push a `dev` publica la portada estática de desarrollo en [GitHub Pages](https://manu2w2.github.io/smmun-register/). Esta vista previa muestra el estado del registro y funciona sin conexión con Supabase. El hosting y el proyecto Supabase aislado de staging siguen pendientes. Consulta [Cómo promover cambios](docs/operations.md#promover-cambios).
 
 ## Repositorios de referencia
 
