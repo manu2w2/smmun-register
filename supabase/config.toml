@@ -27,3 +27,7 @@ site_url = "http://localhost:5173"
 
 [functions.catalog-sync]
 verify_jwt = false
+
+[functions.catalog-read]
+# La función valida el token con Supabase Auth y comprueba la lista de usuarios.
+verify_jwt = false

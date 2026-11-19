@@ -4,13 +4,15 @@ Propuesta preparada el 18 de noviembre de 2026. La carga manual por CSV está im
 
 ## Estado de implementación
 
-La Edge Function `supabase/functions/catalog-sync`, los roles, el registro de corridas, el límite compartido por proyecto de Google dentro de una misma base y el panel local están implementados. El SQL `supabase/operations/schedule-catalog-sync.sql` prepara el horario, que debe ejecutarse únicamente en el entorno de staging identificado. La sincronización automática no está activada.
+La Edge Function `supabase/functions/catalog-sync`, los roles, el registro de corridas, el límite compartido por proyecto de Google dentro de una misma base y el panel local están implementados. Las dos migraciones se aplicaron al proyecto gratuito `smmun-staging` y sus versiones se alinearon con la base local y los archivos del repositorio. Las funciones `catalog-sync` y `catalog-read` están desplegadas en staging. La sincronización automática no está activada. El SQL `supabase/operations/schedule-catalog-sync.sql` prepara el horario, que debe ejecutarse únicamente después de probar el entorno.
 
 La función requiere `CATALOG_SYNC_SECRET`, `CATALOG_EDITION`, `CATALOG_MODE` (`preview` o `apply`), `CATALOG_SPREADSHEET_ID`, `CATALOG_SHEET_ID`, `CATALOG_GOOGLE_PROJECT_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON` y `CATALOG_DATABASE_URL`. La conexión debe tener una sesión estable y asumir los permisos de `catalog_sync`. El trabajo programado necesita los secretos `catalog_sync_url` y `catalog_sync_secret` en Vault. Las credenciales son específicas de cada entorno y se mantienen fuera del repositorio.
 
 Los límites compartidos dependen de la base de datos usada para registrar reservas. Si staging y producción usan bases distintas con el mismo proyecto de Google, sus presupuestos no se coordinan. Utiliza proyectos de Google separados o implementa una cuota compartida antes de activarlos simultáneamente.
 
-El panel de desarrollo usa `npm run catalog:panel` después de `npm run build` y consulta únicamente Supabase local. El endpoint autenticado para staging, las alertas, la prueba con Google y la verificación de Edge Runtime siguen pendientes.
+El panel de desarrollo usa `npm run catalog:panel` después de `npm run build` y consulta únicamente Supabase local. El panel también incluye un modo alojado con inicio de sesión, y `catalog-read` valida usuarios autorizados. Faltan configurar y probar el acceso a la base desde las funciones mediante usuarios de PostgreSQL limitados, la sesión real de Auth y las alertas. Consulta [su contrato](catalog-read-api.md).
+
+Para staging se creó una [hoja sintética independiente](https://docs.google.com/spreadsheets/d/1jjXXL5v1Q-FUgiAymetLaCtl7h0iHgJ9HdSFxnRwPSE/edit), con pestaña `SMMUN — catálogo sintético de staging`, ID `1709167246`. La cuenta de servicio tiene permiso de lector y se verificó una lectura directa de sus tres filas. La función `catalog-sync` está configurada en `preview` para esta hoja, pero aún requiere `CATALOG_DATABASE_URL` y un usuario de PostgreSQL con permisos limitados. El intento de conexión al pooler desde este equipo terminó antes de completar la simulación de CLI. La ejecución integral en Edge y la activación de Cron siguen pendientes.
 
 ## Flujo por edición
 

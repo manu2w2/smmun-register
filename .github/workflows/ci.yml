@@ -47,6 +47,7 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npm run catalog:test-sync
+      - run: npm run catalog:test-read
       - name: Start local Supabase
         run: npm run db:start >/dev/null
       - name: Verify local PostgreSQL

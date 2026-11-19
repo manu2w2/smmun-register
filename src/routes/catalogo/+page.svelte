@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { createClient, type SupabaseClient } from '@supabase/supabase-js';
   type Representation = {
     id: string; edition: string; committee: string; representation_name: string;
     representation_type: string; allows_co_delegation: boolean; disponible: boolean;
@@ -16,6 +17,20 @@
   let loading = $state(false);
   let error = $state('');
   let lastRead = $state<Date | null>(null);
+  const panelMode = import.meta.env.VITE_CATALOG_PANEL_MODE || 'local';
+  const hosted = panelMode === 'hosted';
+  let client: SupabaseClient | undefined;
+  let baseUrl = '';
+  let publishableKey = '';
+  let signedIn = $state(false);
+  let email = $state('');
+  let password = $state('');
+  let signingIn = $state(false);
+  let signingOut = $state(false);
+  let authError = $state('');
+  let configurationError = $state('');
+  let sessionGeneration = 0;
+  let currentRequest: AbortController | undefined;
   let editions = $derived([...new Set((catalog?.representations ?? []).map((row) => row.edition))].sort());
   let committees = $derived([...new Set((catalog?.representations ?? [])
     .filter((row) => !edition || row.edition === edition).map((row) => row.committee))].sort());
@@ -35,25 +50,119 @@
     if (run.mode === 'preview') return 'Vista previa completada';
     return (run.altas ?? 0) + (run.cambios ?? 0) > 0 ? 'Actualización aplicada' : 'Sin cambios';
   }
-  async function refresh() {
-    if (loading) return;
-    loading = true;
+  function clearCatalog() {
+    catalog = null;
+    lastRead = null;
+    edition = '';
+    committee = '';
+  }
+  async function signIn(event: SubmitEvent) {
+    event.preventDefault();
+    if (!client || signingIn || signingOut) return;
+    signingIn = true;
+    authError = '';
     try {
-      const response = await fetch('/api/catalog', { cache: 'no-store' });
+      const result = await client.auth.signInWithPassword({ email: email.trim(), password });
+      password = '';
+      if (result.error || !result.data.session) {
+        authError = 'No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.';
+        return;
+      }
+      sessionGeneration++;
+      signedIn = true;
+      await refresh();
+    } catch {
+      password = '';
+      authError = 'No se pudo conectar con el servicio de acceso.';
+    } finally {
+      signingIn = false;
+    }
+  }
+  async function signOut(message = '') {
+    sessionGeneration++;
+    currentRequest?.abort();
+    currentRequest = undefined;
+    loading = false;
+    signedIn = false;
+    password = '';
+    error = '';
+    authError = message;
+    clearCatalog();
+    if (client) {
+      signingOut = true;
+      try { await client.auth.signOut({ scope: 'local' }); }
+      catch { /* La vista ya no conserva datos ni tokens. */ }
+      finally { signingOut = false; }
+    }
+  }
+  async function refresh() {
+    if (loading || configurationError || (hosted && (!signedIn || !client))) return;
+    loading = true;
+    const generation = sessionGeneration;
+    const controller = new AbortController();
+    currentRequest = controller;
+    try {
+      let endpoint = '/api/catalog';
+      let headers: Record<string, string> = {};
+      if (hosted && client) {
+        const { data, error: sessionError } = await client.auth.getSession();
+        if (sessionError || !data.session) {
+          await signOut('La sesión terminó. Inicia sesión nuevamente.');
+          return;
+        }
+        endpoint = baseUrl + '/functions/v1/catalog-read';
+        headers = { apikey: publishableKey, authorization: 'Bearer ' + data.session.access_token };
+      }
+      if (generation !== sessionGeneration) return;
+      const response = await fetch(endpoint, { cache: 'no-store', credentials: 'omit', headers, signal: controller.signal });
+      if (generation !== sessionGeneration) return;
+      if (hosted && (response.status === 401 || response.status === 403)) {
+        await signOut('Tu sesión no tiene acceso al catálogo. Contacta a la persona administradora.');
+        return;
+      }
       if (!response.ok) throw new Error('No se pudo consultar el catálogo.');
-      catalog = await response.json();
+      const data = await response.json();
+      if (generation !== sessionGeneration) return;
+      if (!Array.isArray(data.representations) || !Array.isArray(data.runs)) throw new Error('Respuesta inválida');
+      catalog = data;
       lastRead = new Date();
       error = '';
     } catch {
-      error = 'No se pudo actualizar la vista. Comprueba que el servidor local y Supabase estén en ejecución.';
-    } finally { loading = false; }
+      if (generation === sessionGeneration) {
+        error = hosted ? 'No se pudo actualizar la vista. Inténtalo nuevamente.'
+          : 'No se pudo actualizar la vista. Comprueba que el servidor local y Supabase estén en ejecución.';
+      }
+    } finally {
+      if (generation === sessionGeneration) {
+        loading = false;
+        currentRequest = undefined;
+      }
+    }
   }
   onMount(() => {
-    void refresh();
+    if (hosted) {
+      try {
+        const url = new URL(import.meta.env.VITE_CATALOG_SUPABASE_URL);
+        const validHttp = url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname));
+        const key = import.meta.env.VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY;
+        if (!validHttp || url.origin !== url.href.replace(/\/$/, '') || !key?.startsWith('sb_publishable_')) throw new Error('configuration');
+        baseUrl = url.origin;
+        publishableKey = key;
+        client = createClient(baseUrl, publishableKey, {
+          auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
+        });
+      } catch {
+        configurationError = 'No se ha configurado el acceso al catálogo.';
+      }
+    } else if (panelMode !== 'local') {
+      configurationError = 'No se ha configurado el acceso al catálogo.';
+    } else {
+      void refresh();
+    }
     const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 60_000);
     const onVisible = () => { if (!document.hidden) void refresh(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+    return () => { currentRequest?.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   });
 </script>
 
@@ -61,8 +170,24 @@
 <main>
   <header>
     <div><p class="eyebrow">SMMUN · CONSULTA INTERNA</p><h1>Catálogo de representaciones</h1><p>Consulta las opciones y el estado de la sincronización.</p></div>
-    <button onclick={refresh} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar vista'}</button>
+    {#if !hosted || signedIn}
+      <div class="actions"><button onclick={refresh} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar vista'}</button>{#if hosted}<button class="secondary" onclick={() => signOut()}>Cerrar sesión</button>{/if}</div>
+    {/if}
   </header>
+  {#if configurationError}
+    <p class="error" role="alert">{configurationError}</p>
+  {:else if hosted && !signedIn}
+    <section class="login" aria-labelledby="login-title">
+      <h2 id="login-title">Iniciar sesión</h2>
+      <p>Ingresa con una cuenta autorizada para consultar el catálogo.</p>
+      {#if authError}<p class="error" role="alert">{authError}</p>{/if}
+      <form onsubmit={signIn}>
+        <label>Correo electrónico<input type="email" autocomplete="username" bind:value={email} required /></label>
+        <label>Contraseña<input type="password" autocomplete="current-password" bind:value={password} required /></label>
+        <button type="submit" disabled={signingIn || signingOut}>{signingIn ? 'Ingresando…' : 'Ingresar'}</button>
+      </form>
+    </section>
+  {:else}
   {#if error}<p class="error" role="alert">{error}{#if lastRead} Última consulta correcta: {date(lastRead)}.{/if}</p>{/if}
   <section class="summary" aria-label="Estado de sincronización" aria-live="polite">
     <div><span>Última corrida</span><strong>{latest ? label(latest) : 'Sin sincronizaciones'}</strong><small>{date(latest?.started_at)}</small></div>
@@ -86,6 +211,7 @@
       </div>
     {/if}
   </section>
+  {/if}
 </main>
 <style>
   :global(html) { font-family: system-ui, sans-serif; color: #190f5b; background: #fffdf8; }
@@ -98,6 +224,13 @@
   .eyebrow { font-size: .75rem; letter-spacing: .12em; font-weight: 750; }
   button { border: 0; border-radius: .5rem; padding: .8rem 1rem; color: white; background: #281a75; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
   button:disabled { opacity: .65; cursor: wait; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .secondary { color: #281a75; background: white; border: 1px solid #b5aec9; }
+  .login { max-width: 28rem; padding: 1.5rem; background: white; border: 1px solid #dfdbe9; border-radius: .75rem; }
+  .login p { color: #595575; }
+  .login .error { color: #802627; }
+  form { display: grid; gap: 1rem; }
+  input { box-sizing: border-box; width: 100%; padding: .65rem; background: white; border: 1px solid #aba4c2; border-radius: .4rem; color: inherit; font: inherit; }
   :global(:focus-visible) { outline: 3px solid #a17514; outline-offset: 3px; }
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #dfdbe9; border: 1px solid #dfdbe9; border-radius: .75rem; overflow: hidden; }
   .summary div { background: white; padding: 1.2rem; display: grid; gap: .5rem; }
