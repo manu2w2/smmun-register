@@ -65,6 +65,20 @@ npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv --apply
 
 El comando sin `--apply` compara el archivo con la edición y muestra altas, cambios y ausencias. La carga conserva `disponible` en las filas existentes. Guarda los archivos exportados fuera de Git, por ejemplo en `exports/`. Consulta los [pasos de revisión](docs/operations.md#actualizar-el-catálogo) y el [plan de sincronización futura](docs/catalog-sync.md).
 
+### Panel local del catálogo
+
+Con Supabase local iniciado, aplica las migraciones y construye la aplicación antes de iniciar el panel.
+
+```sh
+npm run db:migrate
+npm run build
+npm run catalog:panel
+```
+
+Abre `http://127.0.0.1:8765/catalogo/`. El panel consulta el catálogo local y las últimas corridas, y actualiza su vista cada minuto. El servidor escucha únicamente en este equipo y está destinado al desarrollo local. Para detenerlo, pulsa Ctrl+C en la terminal.
+
+La Edge Function `catalog-sync` y el SQL de programación cada 20 minutos están preparados para staging. La conexión a Google, las credenciales por entorno, el despliegue y el endpoint autenticado para el panel alojado siguen pendientes. Consulta el [plan y requisitos de activación](docs/catalog-sync.md).
+
 ```sh
 npm run check
 npm run build

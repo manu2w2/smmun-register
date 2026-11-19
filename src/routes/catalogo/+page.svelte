@@ -1,0 +1,116 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  type Representation = {
+    id: string; edition: string; committee: string; representation_name: string;
+    representation_type: string; allows_co_delegation: boolean; disponible: boolean;
+  };
+  type Run = {
+    id: string; edition: string; mode: string; status: string; started_at: string;
+    finished_at: string | null; altas: number | null; cambios: number | null;
+    iguales: number | null; ausentes: number | null; error_code: string | null;
+  };
+  type Catalog = { representations: Representation[]; runs: Run[] };
+  let catalog = $state<Catalog | null>(null);
+  let edition = $state('');
+  let committee = $state('');
+  let loading = $state(false);
+  let error = $state('');
+  let lastRead = $state<Date | null>(null);
+  let editions = $derived([...new Set((catalog?.representations ?? []).map((row) => row.edition))].sort());
+  let committees = $derived([...new Set((catalog?.representations ?? [])
+    .filter((row) => !edition || row.edition === edition).map((row) => row.committee))].sort());
+  let rows = $derived((catalog?.representations ?? []).filter((row) =>
+    (!edition || row.edition === edition) && (!committee || row.committee === committee)));
+  let latest = $derived((catalog?.runs ?? []).find((run) => !edition || run.edition === edition));
+  let applied = $derived((catalog?.runs ?? []).find((run) =>
+    (!edition || run.edition === edition) && run.status === 'success' && run.mode === 'apply'));
+  function date(value: string | Date | null | undefined) {
+    return value ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Sin registro';
+  }
+  function label(run: Run) {
+    if (run.status === 'running') return 'En curso';
+    if (run.status === 'review') return 'Requiere revisión';
+    if (run.status === 'error') return 'Falló';
+    if (run.status === 'skipped') return 'Omitida';
+    if (run.mode === 'preview') return 'Vista previa completada';
+    return (run.altas ?? 0) + (run.cambios ?? 0) > 0 ? 'Actualización aplicada' : 'Sin cambios';
+  }
+  async function refresh() {
+    if (loading) return;
+    loading = true;
+    try {
+      const response = await fetch('/api/catalog', { cache: 'no-store' });
+      if (!response.ok) throw new Error('No se pudo consultar el catálogo.');
+      catalog = await response.json();
+      lastRead = new Date();
+      error = '';
+    } catch {
+      error = 'No se pudo actualizar la vista. Comprueba que el servidor local y Supabase estén en ejecución.';
+    } finally { loading = false; }
+  }
+  onMount(() => {
+    void refresh();
+    const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 60_000);
+    const onVisible = () => { if (!document.hidden) void refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  });
+</script>
+
+<svelte:head><title>Catálogo | SMMUN</title></svelte:head>
+<main>
+  <header>
+    <div><p class="eyebrow">SMMUN · CONSULTA INTERNA</p><h1>Catálogo de representaciones</h1><p>Consulta las opciones y el estado de la sincronización.</p></div>
+    <button onclick={refresh} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar vista'}</button>
+  </header>
+  {#if error}<p class="error" role="alert">{error}{#if lastRead} Última consulta correcta: {date(lastRead)}.{/if}</p>{/if}
+  <section class="summary" aria-label="Estado de sincronización" aria-live="polite">
+    <div><span>Última corrida</span><strong>{latest ? label(latest) : 'Sin sincronizaciones'}</strong><small>{date(latest?.started_at)}</small></div>
+    <div><span>Última aplicación</span><strong>{date(applied?.finished_at)}</strong></div>
+    <div><span>Resultado de la última corrida</span>{#if latest && latest.altas !== null}<strong>{latest.altas} altas · {latest.cambios} cambios · {latest.iguales} iguales · {latest.ausentes} ausentes</strong>{:else}<strong>Sin datos</strong>{/if}</div>
+  </section>
+  <section class="catalog" aria-labelledby="catalog-title">
+    <div class="section-heading"><h2 id="catalog-title">Representaciones</h2><p>{rows.length} opciones</p></div>
+    <div class="filters">
+      <label>Edición <select bind:value={edition} onchange={() => { committee = ''; }}><option value="">Todas</option>{#each editions as value}<option {value}>{value}</option>{/each}</select></label>
+      <label>Comité <select bind:value={committee}><option value="">Todos</option>{#each committees as value}<option {value}>{value}</option>{/each}</select></label>
+    </div>
+    {#if !catalog && loading}<p role="status">Cargando catálogo…</p>
+    {:else if catalog && rows.length === 0}<p>No hay representaciones para esta selección.</p>
+    {:else if catalog}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex: permite desplazar la tabla con el teclado -->
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de representaciones, desplazable horizontalmente">
+        <table><thead><tr><th>Edición</th><th>Comité</th><th>Representación</th><th>Tipo</th><th>Codelegación</th><th>Disponibilidad</th></tr></thead>
+          <tbody>{#each rows as row (row.id)}<tr><td>{row.edition}</td><td>{row.committee}</td><td>{row.representation_name}</td><td>{row.representation_type}</td><td>{row.allows_co_delegation ? 'Sí' : 'No'}</td><td><span class:available={row.disponible} class="badge">{row.disponible ? 'Disponible' : 'No disponible'}</span></td></tr>{/each}</tbody>
+        </table>
+      </div>
+    {/if}
+  </section>
+</main>
+<style>
+  :global(html) { font-family: system-ui, sans-serif; color: #190f5b; background: #fffdf8; }
+  :global(body) { margin: 0; }
+  main { max-width: 76rem; margin: 0 auto; padding: 3rem 1.25rem; }
+  header { display: flex; justify-content: space-between; align-items: end; gap: 1.5rem; margin-bottom: 2rem; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); margin: .3rem 0; }
+  h2 { font-size: 1.25rem; margin: 0; } p { line-height: 1.5; }
+  header p, .section-heading p { color: #595575; margin: .35rem 0; }
+  .eyebrow { font-size: .75rem; letter-spacing: .12em; font-weight: 750; }
+  button { border: 0; border-radius: .5rem; padding: .8rem 1rem; color: white; background: #281a75; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap; }
+  button:disabled { opacity: .65; cursor: wait; }
+  :global(:focus-visible) { outline: 3px solid #a17514; outline-offset: 3px; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #dfdbe9; border: 1px solid #dfdbe9; border-radius: .75rem; overflow: hidden; }
+  .summary div { background: white; padding: 1.2rem; display: grid; gap: .5rem; }
+  .summary span, small { color: #595575; font-size: .85rem; }
+  .summary strong { line-height: 1.45; }
+  .catalog { margin-top: 2rem; background: white; border: 1px solid #dfdbe9; border-radius: .75rem; padding: 1.25rem; }
+  .filters { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+  label { display: grid; gap: .35rem; font-size: .9rem; font-weight: 650; }
+  select { min-width: 12rem; max-width: 100%; padding: .55rem; background: white; border: 1px solid #aba4c2; border-radius: .4rem; color: inherit; font: inherit; }
+  .table-wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; text-align: left; font-size: .9rem; }
+  th, td { padding: .85rem; border-bottom: 1px solid #eceaf2; } th { color: #595575; white-space: nowrap; }
+  .badge { display: inline-block; white-space: nowrap; background: #eeeaf1; color: #54455d; border-radius: 1rem; padding: .25rem .6rem; }
+  .available { color: #165d3b; background: #e1f4e9; }
+  .error { color: #802627; background: #fff0ef; border: 1px solid #efc7c3; padding: 1rem; border-radius: .5rem; }
+  @media (max-width: 650px) { header { align-items: start; flex-direction: column; } .summary { grid-template-columns: 1fr; } .filters label, select { width: 100%; } }
+</style>

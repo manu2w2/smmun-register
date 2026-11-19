@@ -18,6 +18,8 @@
     "db:migrate": "supabase migration up",
     "db:status": "supabase status",
     "catalog:import": "python -X utf8 scripts/import_catalog.py",
+    "catalog:panel": "python -X utf8 scripts/catalog_panel.py",
+    "catalog:test-sync": "node --test supabase/functions/catalog-sync/catalog.test.mjs",
     "db:stop": "supabase stop"
   },
   "devDependencies": {

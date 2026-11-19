@@ -46,6 +46,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+      - run: npm run catalog:test-sync
       - name: Start local Supabase
         run: npm run db:start >/dev/null
       - name: Verify local PostgreSQL
@@ -56,6 +57,7 @@ jobs:
           npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv
           npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv --apply
           npm exec --no -- supabase db query --file supabase/tests/catalog.sql
+          docker exec -i supabase_db_smmun-register psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < supabase/tests/catalog_sync.sql
       - name: Stop local Supabase
         if: always()
         run: |

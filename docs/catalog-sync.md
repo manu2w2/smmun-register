@@ -2,6 +2,16 @@
 
 Propuesta preparada el 18 de noviembre de 2026. La carga manual por CSV está implementada. La automatización leerá las celdas directamente y enviará el mismo tipo de lote a `catalog.import_representations`. Así se reutilizan la comparación, la identidad y la escritura transaccional que ya se probaron con CSV.
 
+## Estado de implementación
+
+La Edge Function `supabase/functions/catalog-sync`, los roles, el registro de corridas, el límite compartido por proyecto de Google dentro de una misma base y el panel local están implementados. El SQL `supabase/operations/schedule-catalog-sync.sql` prepara el horario, que debe ejecutarse únicamente en el entorno de staging identificado. La sincronización automática no está activada.
+
+La función requiere `CATALOG_SYNC_SECRET`, `CATALOG_EDITION`, `CATALOG_MODE` (`preview` o `apply`), `CATALOG_SPREADSHEET_ID`, `CATALOG_SHEET_ID`, `CATALOG_GOOGLE_PROJECT_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON` y `CATALOG_DATABASE_URL`. La conexión debe tener una sesión estable y asumir los permisos de `catalog_sync`. El trabajo programado necesita los secretos `catalog_sync_url` y `catalog_sync_secret` en Vault. Las credenciales son específicas de cada entorno y se mantienen fuera del repositorio.
+
+Los límites compartidos dependen de la base de datos usada para registrar reservas. Si staging y producción usan bases distintas con el mismo proyecto de Google, sus presupuestos no se coordinan. Utiliza proyectos de Google separados o implementa una cuota compartida antes de activarlos simultáneamente.
+
+El panel de desarrollo usa `npm run catalog:panel` después de `npm run build` y consulta únicamente Supabase local. El endpoint autenticado para staging, las alertas, la prueba con Google y la verificación de Edge Runtime siguen pendientes.
+
 ## Flujo por edición
 
 1. **Resolver la fuente.** Configurar por entorno la edición, el ID del archivo, el ID de la pestaña y el modo (`preview` o `apply`). La [hoja de prueba](https://docs.google.com/spreadsheets/d/1zO-z01dyBUPBbhA-eroPf6CL3YBk5cpRl-yYEkwNoCU/edit#gid=0) usa la pestaña `catalogo` con ID `0`. Resolver su título actual a partir del ID. Leer A:D con `spreadsheets.values.get`, `majorDimension=ROWS` y `UNFORMATTED_VALUE`. La cuenta de servicio recibe acceso de lector al archivo y solicita el alcance `spreadsheets.readonly`. [Lectura de rangos](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get) · [Permisos de Sheets](https://developers.google.com/workspace/sheets/api/scopes)
