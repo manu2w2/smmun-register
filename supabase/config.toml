@@ -24,3 +24,6 @@ port = 54324
 
 [auth]
 site_url = "http://localhost:5173"
+
+[functions.catalog-sync]
+verify_jwt = false
