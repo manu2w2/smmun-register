@@ -36,26 +36,7 @@ try {
       return await sql.begin(async (tx) => {
         await tx.unsafe('set transaction read only');
         await tx.unsafe('set local role catalog_viewer');
-        const [result] = await tx.unsafe([
-          "select jsonb_build_object(",
-          "  'representations', coalesce((",
-          "    select jsonb_agg(to_jsonb(r) order by r.edition, r.committee, r.representation_name)",
-          "    from catalog.representations r",
-          "  ), '[]'::jsonb),",
-          "  'runs', coalesce((",
-          "    select jsonb_agg(to_jsonb(recent) order by started_at desc)",
-          "    from (",
-          "      (select distinct on (edition) id, edition, mode, status, started_at, finished_at,",
-          "        altas, cambios, iguales, ausentes, error_code from catalog.sync_runs",
-          "        order by edition, started_at desc)",
-          "      union",
-          "      (select distinct on (edition) id, edition, mode, status, started_at, finished_at,",
-          "        altas, cambios, iguales, ausentes, error_code from catalog.sync_runs",
-          "        where mode = 'apply' and status = 'success' order by edition, started_at desc)",
-          "    ) recent",
-          "  ), '[]'::jsonb)",
-          ") as catalog",
-        ].join('\n'));
+        const [result] = await tx`select catalog.panel_snapshot() as catalog`;
         return result.catalog;
       });
     } finally {

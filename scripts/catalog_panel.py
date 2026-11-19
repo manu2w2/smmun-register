@@ -12,27 +12,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
 PORT = 8765
-QUERY = """
-select jsonb_build_object(
-  'representations', coalesce((
-    select jsonb_agg(to_jsonb(r) order by r.edition, r.committee, r.representation_name)
-    from catalog.representations r
-  ), '[]'::jsonb),
-  'runs', coalesce((
-    select jsonb_agg(to_jsonb(recent) order by started_at desc)
-    from (
-      (select distinct on (edition) id, edition, mode, status, started_at, finished_at,
-        altas, cambios, iguales, ausentes, error_code
-       from catalog.sync_runs order by edition, started_at desc)
-      union
-      (select distinct on (edition) id, edition, mode, status, started_at, finished_at,
-        altas, cambios, iguales, ausentes, error_code
-       from catalog.sync_runs where mode = 'apply' and status = 'success'
-       order by edition, started_at desc)
-    ) recent
-  ), '[]'::jsonb)
-) as catalog;
-"""
+QUERY = "select catalog.panel_snapshot() as catalog;"
 
 
 class Handler(SimpleHTTPRequestHandler):
