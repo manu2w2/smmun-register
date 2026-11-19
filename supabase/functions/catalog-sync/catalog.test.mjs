@@ -54,3 +54,31 @@ test('429 respeta Retry-After, el presupuesto y el máximo de intentos', async (
   }), /quota_budget/);
   assert.equal(fetched, false);
 });
+
+test('no solicita la siguiente lectura al terminar el plazo común de la corrida', async () => {
+  const metrics = { attempts: 0, rate_limited: 0 };
+  let reservations = 0;
+  await assert.rejects(getSheetRows('sheet', 0, 'test', async () => { reservations++; return true; }, metrics, {
+    deadline: Date.now() - 1,
+    fetcher: async () => { throw new Error('No debe llamarse'); },
+  }), /timeout/);
+  assert.equal(reservations, 0);
+  assert.equal(metrics.attempts, 0);
+});
+
+test('si Sheets deja de responder o no encuentra la pestaña nunca acepta un lote parcial', async () => {
+  const metrics = { attempts: 0, rate_limited: 0 };
+  let request = 0;
+  await assert.rejects(getSheetRows('sheet', 0, 'test', async () => true, metrics, {
+    fetcher: async () => ++request === 1
+      ? Response.json({ sheets: [{ properties: { sheetId: 0, title: 'catalogo' } }] })
+      : new Response('', { status: 503 }),
+    wait: async () => {},
+  }), /google_unavailable/);
+  assert.equal(metrics.attempts, 4);
+  const missing = { attempts: 0, rate_limited: 0 };
+  await assert.rejects(getSheetRows('sheet', 0, 'test', async () => true, missing, {
+    fetcher: async () => Response.json({ sheets: [] }),
+  }), /sheet_missing/);
+  assert.equal(missing.attempts, 1);
+});

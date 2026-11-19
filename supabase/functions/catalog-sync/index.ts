@@ -77,8 +77,11 @@ Deno.serve(async (request) => {
   } catch (error) {
     const code = error instanceof SyncError ? error.code : 'sync_error';
     if (sql && runId) {
+      // Si la confirmación de COMMIT se perdió, la transacción pudo haber
+      // terminado correctamente. Conserva el resultado ya confirmado.
       try { await sql`update catalog.sync_runs set status='error', finished_at=now(), error_code=${code},
-        attempts=${metrics.attempts}, rate_limited=${metrics.rate_limited} where id=${runId}`; } catch { /* El estado será revisado por caducidad. */ }
+        attempts=${metrics.attempts}, rate_limited=${metrics.rate_limited}
+        where id=${runId} and status='running'`; } catch { /* El estado será revisado por caducidad. */ }
     }
     return Response.json({ status: 'error', code }, { status: 500 });
   } finally {
