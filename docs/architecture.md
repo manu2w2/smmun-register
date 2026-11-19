@@ -17,6 +17,8 @@ La tabla madre `catalog.representations` vive en un esquema privado. La carga ma
 
 ## Límites de integración
 
+El desarrollo usa el panel autenticado contra staging desde el origen fijo de Vite. La portada se prerenderiza para la publicación estática. El servidor local de Python y la función de lectura comparten una consulta SQL con los permisos del invocante. El operador activa o pausa el único trabajo de catálogo del proyecto y registra su edición en la misma transacción. Así el lector puede distinguir un atraso de una pausa sin obtener acceso a Cron o a Vault.
+
 - La apertura del formulario y la aceptación de solicitudes deben respetar la configuración de la edición. El servidor aplica la regla aunque la interfaz tenga un estado desactualizado.
 - Si la recepción inicia entregas asíncronas, la aceptación, la idempotencia y el trabajo pendiente se confirman en una sola transacción. Correos y exportaciones siguen su propio estado y se pueden recuperar por separado.
 - Storage y PostgreSQL tienen operaciones separadas. El flujo de carga necesita reconciliar fallos parciales y limpiar archivos sin registro asociado.

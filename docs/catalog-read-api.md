@@ -4,6 +4,8 @@ La función `catalog-read` consulta representaciones y las últimas corridas por
 
 El panel Svelte admite un modo alojado con inicio de sesión por correo y contraseña. El modo local utiliza su propio servidor y permanece separado de esta función.
 
+La respuesta contiene `representations`, `runs` y `schedules`. La consulta compartida `catalog.panel_snapshot()` incluye por edición la última corrida, la última terminada y la última aplicación correcta. Cada elemento de `schedules` indica `edition`, `active` y `overdue`. Si falta la edición en la lista, se encuentra en pruebas manuales. Un servidor de la versión anterior que omite el campo completo se muestra con programación desconocida. El historial permite filtrar una edición antes de importar sus primeras filas.
+
 ## Compilación del panel alojado
 
 Definir antes de compilar `VITE_CATALOG_PANEL_MODE=hosted`, `VITE_CATALOG_SUPABASE_URL` con la URL del proyecto y `VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY` con la clave `sb_publishable_` del mismo proyecto. Las variables `VITE_` se incorporan a los archivos públicos del navegador y deben contener únicamente valores publicables. El origen del panel debe coincidir con `CATALOG_PANEL_ORIGIN` en la función. Las claves secretas y las conexiones a PostgreSQL se configuran solo en el servidor.

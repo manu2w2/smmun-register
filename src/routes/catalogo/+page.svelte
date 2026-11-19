@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { createClient, type SupabaseClient } from '@supabase/supabase-js';
   type Representation = {
     id: string; edition: string; committee: string; representation_name: string;
@@ -10,16 +10,17 @@
     finished_at: string | null; altas: number | null; cambios: number | null;
     iguales: number | null; ausentes: number | null; error_code: string | null;
   };
-  type Catalog = { representations: Representation[]; runs: Run[] };
+  type Schedule = { edition: string; active: boolean; overdue: boolean };
+  type Catalog = { representations: Representation[]; runs: Run[]; schedules?: Schedule[] };
   let catalog = $state<Catalog | null>(null);
   let edition = $state('');
   let committee = $state('');
   let loading = $state(false);
   let error = $state('');
   let lastRead = $state<Date | null>(null);
-  const panelMode = import.meta.env.VITE_CATALOG_PANEL_MODE || 'local';
+  const panelMode = import.meta.env.VITE_CATALOG_PANEL_MODE || (import.meta.env.DEV ? 'hosted' : 'local');
   const hosted = panelMode === 'hosted';
-  let client: SupabaseClient | undefined;
+  let client = $state.raw<SupabaseClient>();
   let baseUrl = '';
   let publishableKey = '';
   let signedIn = $state(false);
@@ -27,18 +28,29 @@
   let password = $state('');
   let signingIn = $state(false);
   let signingOut = $state(false);
+  let emailInput = $state<HTMLInputElement>();
+  let refreshButton = $state<HTMLButtonElement>();
   let authError = $state('');
   let configurationError = $state('');
   let sessionGeneration = 0;
   let currentRequest: AbortController | undefined;
-  let editions = $derived([...new Set((catalog?.representations ?? []).map((row) => row.edition))].sort());
+  let editions = $derived(catalog ? [...new Set(
+    [...catalog.representations, ...catalog.runs, ...(catalog.schedules ?? [])].map(row => row.edition)
+  )].sort() : []);
   let committees = $derived([...new Set((catalog?.representations ?? [])
     .filter((row) => !edition || row.edition === edition).map((row) => row.committee))].sort());
   let rows = $derived((catalog?.representations ?? []).filter((row) =>
     (!edition || row.edition === edition) && (!committee || row.committee === committee)));
-  let latest = $derived((catalog?.runs ?? []).find((run) => !edition || run.edition === edition));
-  let applied = $derived((catalog?.runs ?? []).find((run) =>
-    (!edition || run.edition === edition) && run.status === 'success' && run.mode === 'apply'));
+  let summaries = $derived((edition ? [edition] : editions).map(value => {
+    const runs = catalog?.runs.filter(run => run.edition === value) ?? [];
+    const completed = runs.filter(run => ['success', 'review', 'error'].includes(run.status))
+      .sort((a, b) => Date.parse(b.finished_at!) - Date.parse(a.finished_at!));
+    return {
+      edition: value, latest: runs[0], completed: completed[0],
+      applied: completed.find(run => run.mode === 'apply' && run.status === 'success'),
+      schedule: catalog?.schedules?.find(schedule => schedule.edition === value)
+    };
+  }));
   function date(value: string | Date | null | undefined) {
     return value ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Sin registro';
   }
@@ -71,6 +83,8 @@
       sessionGeneration++;
       signedIn = true;
       await refresh();
+      await tick();
+      if (signedIn) refreshButton?.focus();
     } catch {
       password = '';
       authError = 'No se pudo conectar con el servicio de acceso.';
@@ -78,7 +92,7 @@
       signingIn = false;
     }
   }
-  async function signOut(message = '') {
+  function endSession(message: string) {
     sessionGeneration++;
     currentRequest?.abort();
     currentRequest = undefined;
@@ -88,12 +102,17 @@
     error = '';
     authError = message;
     clearCatalog();
+  }
+  async function signOut(message = '') {
+    endSession(message);
     if (client) {
       signingOut = true;
       try { await client.auth.signOut({ scope: 'local' }); }
       catch { /* La vista ya no conserva datos ni tokens. */ }
       finally { signingOut = false; }
     }
+    await tick();
+    emailInput?.focus();
   }
   async function refresh() {
     if (loading || configurationError || (hosted && (!signedIn || !client))) return;
@@ -145,24 +164,39 @@
         const url = new URL(import.meta.env.VITE_CATALOG_SUPABASE_URL);
         const validHttp = url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname));
         const key = import.meta.env.VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY;
-        if (!validHttp || url.origin !== url.href.replace(/\/$/, '') || !key?.startsWith('sb_publishable_')) throw new Error('configuration');
+        if (!validHttp || url.origin !== url.href.replace(/\/$/, '')) throw new Error('URL');
+        if (!key?.startsWith('sb_publishable_')) throw new Error('publishable');
         baseUrl = url.origin;
         publishableKey = key;
         client = createClient(baseUrl, publishableKey, {
           auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
         });
-      } catch {
-        configurationError = 'No se ha configurado el acceso al catálogo.';
+        client.auth.onAuthStateChange(event => {
+          if (event === 'SIGNED_OUT' && signedIn) {
+            endSession('La sesión terminó. Inicia sesión nuevamente.');
+            void tick().then(() => emailInput?.focus());
+          }
+        });
+      } catch (cause) {
+        const variable = cause instanceof Error && cause.message === 'publishable'
+          ? 'VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY' : 'VITE_CATALOG_SUPABASE_URL';
+        configurationError = `Revisa ${variable} en .env.development.local y reinicia npm run dev.`;
       }
     } else if (panelMode !== 'local') {
-      configurationError = 'No se ha configurado el acceso al catálogo.';
+      configurationError = 'Configura VITE_CATALOG_PANEL_MODE=hosted en .env.development.local y reinicia npm run dev.';
     } else {
       void refresh();
     }
     const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 60_000);
     const onVisible = () => { if (!document.hidden) void refresh(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { currentRequest?.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+    return () => {
+      sessionGeneration++;
+      currentRequest?.abort();
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      void client?.auth.dispose();
+    };
   });
 </script>
 
@@ -171,7 +205,7 @@
   <header>
     <div><p class="eyebrow">SMMUN · CONSULTA INTERNA</p><h1>Catálogo de representaciones</h1><p>Consulta las opciones y el estado de la sincronización.</p></div>
     {#if !hosted || signedIn}
-      <div class="actions"><button onclick={refresh} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar vista'}</button>{#if hosted}<button class="secondary" onclick={() => signOut()}>Cerrar sesión</button>{/if}</div>
+      <div class="actions"><button bind:this={refreshButton} onclick={refresh} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar vista'}</button>{#if hosted}<button class="secondary" onclick={() => signOut()}>Cerrar sesión</button>{/if}</div>
     {/if}
   </header>
   {#if configurationError}
@@ -182,18 +216,28 @@
       <p>Ingresa con una cuenta autorizada para consultar el catálogo.</p>
       {#if authError}<p class="error" role="alert">{authError}</p>{/if}
       <form onsubmit={signIn}>
-        <label>Correo electrónico<input type="email" autocomplete="username" bind:value={email} required /></label>
+        <label>Correo electrónico<input type="email" autocomplete="username" bind:this={emailInput} bind:value={email} required /></label>
         <label>Contraseña<input type="password" autocomplete="current-password" bind:value={password} required /></label>
-        <button type="submit" disabled={signingIn || signingOut}>{signingIn ? 'Ingresando…' : 'Ingresar'}</button>
+        <button type="submit" disabled={!client || signingIn || signingOut}>{signingIn ? 'Ingresando…' : 'Ingresar'}</button>
       </form>
     </section>
   {:else}
   {#if error}<p class="error" role="alert">{error}{#if lastRead} Última consulta correcta: {date(lastRead)}.{/if}</p>{/if}
-  <section class="summary" aria-label="Estado de sincronización" aria-live="polite">
+  {#if catalog && editions.length === 0}<p role="status">Aún no hay representaciones ni corridas. Ejecuta la primera vista previa de la hoja de staging.</p>{/if}
+  {#each summaries as { edition: value, latest, completed, applied, schedule } (value)}
+  <section class="monitor" aria-label={`Sincronización de ${value}`}>
+    <h2>{value}</h2>
+    <p>{catalog?.schedules === undefined ? 'Estado de programación desconocido' : !schedule ? 'Pruebas manuales' : schedule.active ? 'Programada cada 20 minutos' : 'Programación pausada'}</p>
+    {#if schedule?.overdue}<p class="error" role="status">Sincronización atrasada. Comprueba el trabajo de Cron y la respuesta de la función en staging.</p>{/if}
+    {#if completed?.status === 'review'}<p class="error" role="status">Requiere revisión. Concilia las ausencias o renombres en la hoja y repite la vista previa.</p>
+    {:else if completed?.status === 'error'}<p class="error" role="status">Falló la sincronización. Revisa la corrida{completed.error_code ? ` (${completed.error_code})` : ''} y ejecuta una vista previa antes de reanudar.</p>{/if}
+  <div class="summary">
     <div><span>Última corrida</span><strong>{latest ? label(latest) : 'Sin sincronizaciones'}</strong><small>{date(latest?.started_at)}</small></div>
     <div><span>Última aplicación</span><strong>{date(applied?.finished_at)}</strong></div>
     <div><span>Resultado de la última corrida</span>{#if latest && latest.altas !== null}<strong>{latest.altas} altas · {latest.cambios} cambios · {latest.iguales} iguales · {latest.ausentes} ausentes</strong>{:else}<strong>Sin datos</strong>{/if}</div>
+  </div>
   </section>
+  {/each}
   <section class="catalog" aria-labelledby="catalog-title">
     <div class="section-heading"><h2 id="catalog-title">Representaciones</h2><p>{rows.length} opciones</p></div>
     <div class="filters">
@@ -236,6 +280,8 @@
   .summary div { background: white; padding: 1.2rem; display: grid; gap: .5rem; }
   .summary span, small { color: #595575; font-size: .85rem; }
   .summary strong { line-height: 1.45; }
+  .monitor { margin: 1.5rem 0; }
+  .monitor h2 { overflow-wrap: anywhere; }
   .catalog { margin-top: 2rem; background: white; border: 1px solid #dfdbe9; border-radius: .75rem; padding: 1.25rem; }
   .filters { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
   label { display: grid; gap: .35rem; font-size: .9rem; font-weight: 650; }

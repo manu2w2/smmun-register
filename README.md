@@ -2,7 +2,7 @@
 
 Nuevo sistema de registro del Modelo de Naciones Unidas del Sureste Mexicano (SMMUN). El proyecto comienza con el catálogo de representaciones y el plan para trasladar la persistencia de Firestore a PostgreSQL en Supabase.
 
-**Estado actual.** El entorno local incluye la tabla del catálogo y su importador CSV. La portada indica que el registro aún está cerrado.
+**Estado actual.** El desarrollo abre el panel del catálogo con acceso por Supabase Auth. La portada pública indica que el registro está cerrado.
 
 | Componente | Alcance actual |
 | --- | --- |
@@ -28,10 +28,12 @@ Usa Node.js **24.18.0** y npm **11.16.0**. El lockfile fija SvelteKit **3.3.1** 
 
 ```sh
 npm ci
+cp .env.example .env.development.local
+# Completa VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY con la clave publicable de smmun-staging.
 npm run dev
 ```
 
-Abre `http://localhost:5173`. La portada de desarrollo se puede comprobar sin Docker.
+En PowerShell también puedes copiar el archivo con `Copy-Item .env.example .env.development.local`. La copia y la configuración de la clave se hacen una vez. Abre [localhost:5173](http://localhost:5173/) e ingresa con una cuenta de staging autorizada. Vite redirige al panel, reserva ese puerto y actualiza la interfaz al editar Svelte. La vista alojada requiere conexión a staging. Docker y Python solo se necesitan para trabajar con la base y las herramientas locales.
 
 ```sh
 docker info
@@ -51,7 +53,7 @@ npm run db:check
 
 Este modo mantiene PostgreSQL, Studio y la API. Para probar Edge Functions o el procesamiento de logs, usa el arranque completo.
 
-Al integrar el cliente, copia `.env.example` a `.env.local` y toma la clave publicable de `npm run db:status`. Las variables con prefijo `PUBLIC_` pueden llegar al navegador. Reserva las credenciales privilegiadas para el servidor. Estos comandos de desarrollo operan sobre el stack local y no requieren vincular el proyecto alojado.
+Configura el navegador mediante `VITE_CATALOG_PANEL_MODE`, `VITE_CATALOG_SUPABASE_URL` y `VITE_CATALOG_SUPABASE_PUBLISHABLE_KEY`. Reserva las credenciales de PostgreSQL y de Google para las funciones. Los comandos de base de datos anteriores operan sobre el stack local.
 
 ### Cargar el catálogo en Supabase local
 
@@ -77,7 +79,7 @@ npm run catalog:panel
 
 Abre `http://127.0.0.1:8765/catalogo/`. El panel consulta el catálogo local y las últimas corridas, y actualiza su vista cada minuto. El servidor escucha únicamente en este equipo y está destinado al desarrollo local. Para detenerlo, pulsa Ctrl+C en la terminal.
 
-La Edge Function `catalog-sync` y el SQL de programación cada 20 minutos están preparados para staging. La conexión a Google, las credenciales por entorno, el despliegue y el endpoint autenticado para el panel alojado siguen pendientes. Consulta el [plan y requisitos de activación](docs/catalog-sync.md).
+En staging, `catalog-sync` lee Sheets y `catalog-read` atiende el panel autenticado. Consulta el [procedimiento de activación, pausa y recuperación](docs/operations.md#operar-la-sincronización-en-staging) y el [contrato de lectura](docs/catalog-read-api.md).
 
 ```sh
 npm run check
@@ -97,7 +99,7 @@ GitHub Actions ejecuta las verificaciones de tipos y compilación, levanta Supab
 
 CI se ejecuta con cada push o pull request de estas ramas. Para una promoción, usa un merge commit para conservar el historial y espera el check `verify`. Documenta en el PR la prueba realizada y cualquier limitación.
 
-Cada push a `dev` publica la portada estática de desarrollo en [GitHub Pages](https://manu2w2.github.io/smmun-register/). Esta vista previa muestra el estado del registro y funciona sin conexión con Supabase. El hosting y el proyecto Supabase aislado de staging siguen pendientes. Consulta [Cómo promover cambios](docs/operations.md#promover-cambios).
+Cada push a `dev` publica la portada estática en [GitHub Pages](https://manu2w2.github.io/smmun-register/). El panel de staging se revisa desde localhost y el backend usa el proyecto aislado `smmun-staging`. Consulta [Cómo promover cambios](docs/operations.md#promover-cambios).
 
 ## Repositorios de referencia
 
