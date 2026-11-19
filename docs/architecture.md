@@ -4,12 +4,12 @@
 
 Google Sheets será la fuente para preparar el catálogo. PostgreSQL en Supabase conservará las representaciones importadas y administrará su disponibilidad. Registros y asignaciones se guardarán en tablas separadas. El panel de Finanzas se mantiene como opción.
 
-Esta decisión resuelve la procedencia del catálogo y del indicador de disponibilidad, frente a los dos catálogos separados del sistema anterior. La [importación propuesta](data-model.md) contempla cambios repetidos sin revertir la disponibilidad operativa.
+La tabla madre `catalog.representations` vive en un esquema privado. La carga manual valida el CSV y llama a una función de PostgreSQL que calcula las diferencias y aplica el lote en una transacción. Centralizar la comparación y la escritura permite reutilizar ambas reglas en la [sincronización futura con Sheets](catalog-sync.md). La hoja mantiene cuatro columnas y el sistema conserva la disponibilidad. El [modelo de datos](data-model.md) describe la identidad y el tratamiento de renombres.
 
 | Componente | Función | Estado |
 | --- | --- | --- |
 | Google Sheets | Preparar las cuatro columnas de catálogo. | Definido. |
-| PostgreSQL en Supabase | Mantener catálogo, disponibilidad, registros y asignaciones. | Plataforma y separación definidas. Falta el esquema físico. |
+| PostgreSQL en Supabase | Mantener catálogo, disponibilidad, registros y asignaciones. | Catálogo e importador CSV locales. Registros y asignaciones en diseño. |
 | SvelteKit y TypeScript | Continuar con la tecnología y la identidad visual del sitio. | Portada estática y entorno de desarrollo configurados. |
 | API de recepción | Validar solicitudes en servidor y guardar su aceptación con idempotencia. | Diseño pendiente. Edge Functions o FastAPI como puente son opciones. |
 | Archivos y entregas | Guardar comprobantes en Storage privado y procesar correos de forma durable, si forman parte del flujo nuevo. | Storage, Queues, Cron y Resend son propuestas. |

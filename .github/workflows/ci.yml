@@ -50,6 +50,12 @@ jobs:
         run: npm run db:start >/dev/null
       - name: Verify local PostgreSQL
         run: npm run db:check
+      - name: Verify catalog and CSV import
+        run: |
+          npm run db:migrate
+          npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv
+          npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv --apply
+          npm exec --no -- supabase db query --file supabase/tests/catalog.sql
       - name: Stop local Supabase
         if: always()
         run: |

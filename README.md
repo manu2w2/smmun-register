@@ -2,7 +2,7 @@
 
 Nuevo sistema de registro del Modelo de Naciones Unidas del Sureste Mexicano (SMMUN). El proyecto comienza con el catálogo de representaciones y el plan para trasladar la persistencia de Firestore a PostgreSQL en Supabase.
 
-**Estado actual.** El repositorio contiene la documentación y la base del entorno de desarrollo. La portada indica que el registro aún está cerrado.
+**Estado actual.** El entorno local incluye la tabla del catálogo y su importador CSV. La portada indica que el registro aún está cerrado.
 
 | Componente | Alcance actual |
 | --- | --- |
@@ -53,7 +53,17 @@ Este modo mantiene PostgreSQL, Studio y la API. Para probar Edge Functions o el 
 
 Al integrar el cliente, copia `.env.example` a `.env.local` y toma la clave publicable de `npm run db:status`. Las variables con prefijo `PUBLIC_` pueden llegar al navegador. Reserva las credenciales privilegiadas para el servidor. Estos comandos de desarrollo operan sobre el stack local y no requieren vincular el proyecto alojado.
 
-El archivo [`fixtures/catalogo.csv`](fixtures/catalogo.csv) contiene filas sintéticas con los cuatro encabezados observados en la hoja y valores `SI`/`NO`. Sirve para preparar la importación de la siguiente fase.
+### Cargar el catálogo en Supabase local
+
+Con Supabase local iniciado y Python 3 disponible como `python`, aplica la migración y prueba con el CSV sintético.
+
+```sh
+npm run db:migrate
+npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv
+npm run catalog:import -- --edition prueba --csv fixtures/catalogo.csv --apply
+```
+
+El comando sin `--apply` compara el archivo con la edición y muestra altas, cambios y ausencias. La carga conserva `disponible` en las filas existentes. Guarda los archivos exportados fuera de Git, por ejemplo en `exports/`. Consulta los [pasos de revisión](docs/operations.md#actualizar-el-catálogo) y el [plan de sincronización futura](docs/catalog-sync.md).
 
 ```sh
 npm run check
@@ -61,7 +71,7 @@ npm run build
 npm run preview
 ```
 
-GitHub Actions ejecuta las verificaciones de tipos y compilación, levanta Supabase local y consulta la versión de PostgreSQL. CI usa contenedores y datos de prueba.
+GitHub Actions ejecuta las verificaciones de tipos y compilación, levanta Supabase local y comprueba el catálogo con datos sintéticos.
 
 ## Flujo de ramas
 

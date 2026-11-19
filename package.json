@@ -15,7 +15,9 @@
     "preview": "vite preview",
     "db:start": "supabase start",
     "db:check": "supabase db query --read-only \"show server_version\"",
+    "db:migrate": "supabase migration up",
     "db:status": "supabase status",
+    "catalog:import": "python -X utf8 scripts/import_catalog.py",
     "db:stop": "supabase stop"
   },
   "devDependencies": {

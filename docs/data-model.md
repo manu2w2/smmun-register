@@ -17,19 +17,16 @@ El catálogo inicial se construirá a partir de una hoja de Google Sheets. La ho
 | `allows_co_delegation` | Admite codelegación | Booleano importado desde la hoja. |
 | `disponible` | PostgreSQL | Booleano obligatorio con valor inicial `true` para cada fila nueva. |
 
-Los nombres técnicos de los cuatro campos importados son de trabajo. La disponibilidad se configura como valor por defecto en PostgreSQL para que aplique al insertar una fila sin ese campo. Un identificador técnico estable es una propuesta para enlazar preferencias y asignaciones sin agregar columnas a la hoja. El formato de ese identificador y la separación física de comités por edición quedan abiertos. [Valores por defecto en PostgreSQL](https://www.postgresql.org/docs/current/ddl-default.html)
+`catalog.representations` añade `id` (UUID estable) y `edition` (identificador elegido al importar). El valor predeterminado de `disponible` se aplica al insertar. El esquema privado y RLS restringen el acceso desde la API. [Valores por defecto en PostgreSQL](https://www.postgresql.org/docs/17/ddl-default.html)
 
-## Importación propuesta
+## Importación por CSV
 
-Empezar con una exportación CSV de la hoja y una importación explícita por edición. Se puede conectar la API de Sheets después si la frecuencia de cambios lo justifica.
+1. El importador acepta los encabezados exactos `comite,nombre_delegacion,tipo_delegacion,permite_codelegacion` en cualquier orden. Recorta los campos y normaliza Unicode a NFC. Acepta `SI`, `SÍ`, `NO`, `TRUE` y `FALSE` sin distinguir mayúsculas. Los campos incompletos y booleanos inválidos se reportan con la línea del CSV.
+2. La identidad inicial es edición, comité y nombre de representación, sin distinguir mayúsculas en comité y nombre según la configuración regional de PostgreSQL. Se conservan los acentos. La muestra de cuatro filas de la pestaña `catalogo` no repite esa combinación. Un tipo distinto en el mismo comité y nombre cuenta como cambio de atributo. Si un catálogo completo necesita distinguir dos filas así, habrá que acordar su identidad antes de cargarlo.
+3. La vista previa devuelve conteos y detalle de altas, cambios y ausencias. Altas y ausencias simultáneas señalan posibles renombres. Un cambio de nombre que altere la identidad requiere conciliación deliberada para conservar el UUID.
+4. La escritura vuelve a calcular las diferencias dentro de la transacción y serializa las importaciones por edición. Solo modifica las columnas de la hoja. La presencia de filas ausentes bloquea la escritura salvo revisión explícita. Una ausencia no altera ni elimina filas.
 
-1. Validar encabezados, campos obligatorios y valores de codelegación. Acordar el formato de origen, por ejemplo casillas booleanas o `Sí`/`No`. Reportar los valores ambiguos con número de fila.
-2. Revisar duplicados y las coincidencias con el catálogo previo. Lo que identifica una fila debe incluir su comité y su edición cuando existan varias ediciones. El nombre solo no identifica una representación.
-3. Mostrar altas, cambios, posibles renombres y filas ausentes antes de aplicar el lote. Con las cuatro columnas, un cambio de nombre puede parecer una fila nueva. Un renombre requiere conservar la identidad previa mediante una conciliación explícita.
-4. Aplicar los cambios válidos en una transacción. Las altas reciben `disponible = true`. En filas existentes, actualizar únicamente los atributos que vienen de la hoja y conservar la disponibilidad. Una fila ausente genera un aviso para revisión.
-5. Verificar conteos y repetir el lote para confirmar que mantiene la misma identidad y no crea duplicados.
-
-La identidad definitiva de importación se fijará con una muestra del catálogo real. Conviene comprobar si dos filas pueden compartir comité y nombre y, en ese caso, distinguirlas sin confundir un cambio de tipo con un alta. [Restricciones de PostgreSQL](https://www.postgresql.org/docs/current/ddl-constraints.html)
+Consulta el [procedimiento operativo](operations.md#actualizar-el-catálogo) y el [plan de sincronización con Google Sheets](catalog-sync.md).
 
 ## Registros y asignaciones
 
@@ -40,7 +37,7 @@ La identidad definitiva de importación se fijará con una muestra del catálogo
 
 Si una representación solo admite una asignación activa, la base deberá impedir que dos operaciones concurrentes la ocupen. En ese escenario, confirmar la asignación y actualizar la disponibilidad, si corresponde, debe ocurrir en una misma transacción. Si existen múltiples cupos, harán falta reglas adicionales para contarlos. Ambas posibilidades quedan para el diseño de asignaciones.
 
-## Casos que deberá cubrir la implementación
+## Casos de verificación
 
 - Una importación nueva crea el catálogo con disponibilidad verdadera.
 - Reimportar la misma hoja mantiene el conteo y una fila que pasó a `false` conserva su valor.

@@ -10,7 +10,12 @@ Mantén `dev` y CI con datos sintéticos. Para un staging alojado, usa credencia
 
 ## Actualizar el catálogo
 
-Preparar la hoja de cuatro columnas, identificar la edición y revisar la vista previa de la importación. Resolver duplicados, renombres y bajas antes de confirmar el lote. Comparar conteos después de aplicar los cambios. La disponibilidad existente se mantiene en PostgreSQL según el [procedimiento propuesto de importación](data-model.md).
+1. Descarga la pestaña del catálogo como CSV UTF-8 separado por comas. Guarda el archivo fuera de Git e identifica la edición correcta.
+2. Ejecuta `npm run catalog:import -- --edition prueba --csv exports/catalogo.csv` contra Supabase local. Revisa `altas`, `cambios`, `iguales` y `ausentes`. El detalle incluye la línea del CSV donde corresponde.
+3. Agrega `--apply` tras revisar el resultado. Si hay ausencias, confirma primero si son omisiones o renombres. Corrige el archivo o concilia el renombre conservando el UUID de la fila. Agrega `--allow-missing` junto con `--apply` únicamente si se acordó conservar esas filas tal cual y aplicar las demás.
+4. Ejecuta la vista previa otra vez. Las filas presentes deben figurar como iguales. Las ausencias revisadas siguen apareciendo mientras falten en el origen.
+
+La disponibilidad sigue en PostgreSQL. La ejecución manual de esta fase usa el stack local y la vista previa se ejecuta como consulta de solo lectura. Consulta el [contrato del catálogo](data-model.md).
 
 ## Revisar registros y asignaciones
 
