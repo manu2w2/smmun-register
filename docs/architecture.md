@@ -4,18 +4,20 @@
 
 Google Sheets será la fuente para preparar el catálogo. PostgreSQL en Supabase conservará las representaciones importadas y administrará su disponibilidad. Registros y asignaciones se guardarán en tablas separadas. El panel de Finanzas se mantiene como opción.
 
-Esta decisión resuelve la procedencia del catálogo y del indicador de disponibilidad, frente a los dos catálogos separados del sistema anterior. La [importación propuesta](data-model.md) contempla cambios repetidos sin revertir la disponibilidad operativa.
+La tabla madre `catalog.representations` vive en un esquema privado. La carga manual valida el CSV y llama a una función de PostgreSQL que calcula las diferencias y aplica el lote en una transacción. Centralizar la comparación y la escritura permite reutilizar ambas reglas en la [sincronización futura con Sheets](catalog-sync.md). La hoja mantiene cuatro columnas y el sistema conserva la disponibilidad. El [modelo de datos](data-model.md) describe la identidad y el tratamiento de renombres.
 
 | Componente | Función | Estado |
 | --- | --- | --- |
 | Google Sheets | Preparar las cuatro columnas de catálogo. | Definido. |
-| PostgreSQL en Supabase | Mantener catálogo, disponibilidad, registros y asignaciones. | Plataforma y separación definidas. Falta el esquema físico. |
-| SvelteKit y TypeScript | Continuar con la tecnología y la identidad visual del sitio. | Propuesta. |
+| PostgreSQL en Supabase | Mantener catálogo, disponibilidad, registros y asignaciones. | Catálogo e importador CSV locales. Registros y asignaciones en diseño. |
+| SvelteKit y TypeScript | Continuar con la tecnología y la identidad visual del sitio. | Portada estática y entorno de desarrollo configurados. |
 | API de recepción | Validar solicitudes en servidor y guardar su aceptación con idempotencia. | Diseño pendiente. Edge Functions o FastAPI como puente son opciones. |
 | Archivos y entregas | Guardar comprobantes en Storage privado y procesar correos de forma durable, si forman parte del flujo nuevo. | Storage, Queues, Cron y Resend son propuestas. |
 | Panel interno | Dar a Finanzas una vista de registros y asignaciones. | En evaluación. |
 
 ## Límites de integración
+
+El desarrollo usa el panel autenticado contra staging desde el origen fijo de Vite. La portada se prerenderiza para la publicación estática. El servidor local de Python y la función de lectura comparten una consulta SQL con los permisos del invocante. El operador activa o pausa el único trabajo de catálogo del proyecto y registra su edición en la misma transacción. Así el lector puede distinguir un atraso de una pausa sin obtener acceso a Cron o a Vault.
 
 - La apertura del formulario y la aceptación de solicitudes deben respetar la configuración de la edición. El servidor aplica la regla aunque la interfaz tenga un estado desactualizado.
 - Si la recepción inicia entregas asíncronas, la aceptación, la idempotencia y el trabajo pendiente se confirman en una sola transacción. Correos y exportaciones siguen su propio estado y se pueden recuperar por separado.

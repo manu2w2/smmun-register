@@ -1,0 +1,39 @@
+{
+  "name": "smmun-register",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "npm": ">=11.16.0 <12"
+  },
+  "packageManager": "npm@11.16.0",
+  "scripts": {
+    "dev": "vite dev",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "build": "vite build",
+    "preview": "vite preview",
+    "db:start": "supabase start",
+    "db:check": "supabase db query --read-only \"show server_version\"",
+    "db:migrate": "supabase migration up",
+    "db:status": "supabase status",
+    "catalog:import": "python -X utf8 scripts/import_catalog.py",
+    "catalog:panel": "python -X utf8 scripts/catalog_panel.py",
+    "catalog:test-sync": "node --test supabase/functions/catalog-sync/catalog.test.mjs",
+    "catalog:test-read": "node --test supabase/functions/catalog-read/handler.test.mjs",
+    "db:stop": "supabase stop"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "4.0.1",
+    "@sveltejs/kit": "3.3.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "supabase": "3.2.0",
+    "svelte": "5.58.0",
+    "svelte-check": "4.7.8",
+    "typescript": "6.0.3",
+    "vite": "8.3.8"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.2"
+  }
+}

@@ -1,0 +1,4 @@
+comite,nombre_delegacion,tipo_delegacion,permite_codelegacion
+Comité de ejemplo,País Aurora,Pais,SI
+Comité de ejemplo,Observatorio del Sur,Organizacion,NO
+Comité alterno,País Aurora,Pais,NO
